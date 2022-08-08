@@ -122,6 +122,9 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	case "/metrics":
 		s.promHandler.ServeHTTP(w, r)
 
+    case "/instance/id":
+        io.WriteString(w, s.store.ID())
+
 	case "/stream":
 		switch r.Method {
 		case http.MethodPost:

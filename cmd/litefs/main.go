@@ -18,6 +18,7 @@ import (
 	"github.com/mattn/go-shellwords"
 	"github.com/superfly/litefs"
 	"github.com/superfly/litefs/consul"
+	"github.com/superfly/litefs/fixedprimary"
 	"github.com/superfly/litefs/fuse"
 	"github.com/superfly/litefs/http"
 	"gopkg.in/yaml.v3"
@@ -84,7 +85,7 @@ type Main struct {
 	Config Config
 
 	Store      *litefs.Store
-	Leaser     *consul.Leaser
+	Leaser     litefs.Leaser
 	FileSystem *fuse.FileSystem
 	HTTPServer *http.Server
 
@@ -169,10 +170,13 @@ func (m *Main) Close() (err error) {
 func (m *Main) Run(ctx context.Context) (err error) {
 	if m.Config.MountDir == "" {
 		return fmt.Errorf("mount path required")
-	} else if m.Config.Consul.URL == "" {
-		return fmt.Errorf("consul URL required")
-	} else if m.Config.Consul.Key == "" {
-		return fmt.Errorf("consul key required")
+	}
+
+    // Enforce exactly one of consul or primary-url
+	if m.Config.Consul.URL == "" && m.Config.PrimaryURL == "" {
+		return fmt.Errorf("One of consul.url, primary-url are required")
+	} else if m.Config.Consul.URL != "" && m.Config.PrimaryURL != "" {
+        return fmt.Errorf("Cannot use both consul.url and primary-url");
 	}
 
 	// Start listening on HTTP server first so we can determine the URL.
@@ -182,9 +186,22 @@ func (m *Main) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("cannot init http server: %w", err)
 	}
 
-	if err := m.initConsul(ctx); err != nil {
-		return fmt.Errorf("cannot init consul: %w", err)
-	} else if err := m.openStore(ctx); err != nil {
+    // Use Consul?
+	if m.Config.Consul.URL != "" {
+    	log.Println("Using Consul to determine primary")
+    	// key must be set
+    	if m.Config.Consul.Key == "" {
+    		return fmt.Errorf("consul.key required")
+    	}
+    	if err := m.initConsul(ctx); err != nil {
+    		return fmt.Errorf("cannot init consul: %w", err)
+    	}
+	} else if m.Config.PrimaryURL != "" {
+    	log.Println("Using FixedPrimary to determine primary")
+    	m.Leaser = fixedprimary.NewLeaser(m.Config.PrimaryURL, m.Store.ID())
+	}
+
+	if err := m.openStore(ctx); err != nil {
 		return fmt.Errorf("cannot open store: %w", err)
 	}
 
@@ -319,6 +336,9 @@ type Config struct {
 		TTL          time.Duration `yaml:"ttl"`
 		LockDelay    time.Duration `yaml:"lock-delay"`
 	} `yaml:"consul"`
+
+    // Fixed leader URL (mutually exclusive with `consul` section)
+    PrimaryURL string `yaml:"primary-url"`
 }
 
 // NewConfig returns a new instance of Config with defaults set.

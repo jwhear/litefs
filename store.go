@@ -12,6 +12,7 @@ import (
 
 	"github.com/superfly/ltx"
 	"golang.org/x/sync/errgroup"
+	"github.com/google/uuid"
 )
 
 // Store represents a collection of databases.
@@ -39,6 +40,9 @@ type Store struct {
 
 	// Callback to notify kernel of file changes.
 	Invalidator Invalidator
+
+    // Unique ID for this store
+	id string
 }
 
 // NewStore returns a new instance of Store.
@@ -51,6 +55,7 @@ func NewStore(path string) *Store {
 		dbsByName: make(map[string]*DB),
 
 		subscribers: make(map[*Subscriber]struct{}),
+		id: uuid.NewString(),
 	}
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 
@@ -59,6 +64,9 @@ func NewStore(path string) *Store {
 
 // Path returns underlying data directory.
 func (s *Store) Path() string { return s.path }
+
+// ID returns underlying unique Store id.
+func (s *Store) ID() string { return s.id }
 
 // DBDir returns the folder that stores a single database.
 func (s *Store) DBDir(id uint32) string {
@@ -435,7 +443,7 @@ func (s *Store) monitorAsReplica(ctx context.Context, primaryURL string) error {
 	posMap := s.PosMap()
 	st, err := s.Client.Stream(ctx, primaryURL, posMap)
 	if err != nil {
-		return fmt.Errorf("connect to primary: %s", err)
+		return fmt.Errorf("connect to primary: %s ('%s')", err, primaryURL)
 	}
 
 	for {
