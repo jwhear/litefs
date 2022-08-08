@@ -101,6 +101,11 @@ func (p Pos) IsZero() bool {
 	return p == (Pos{})
 }
 
+// Format formats pos as zero-padded <txid><checksum>
+func (p Pos) Format() string {
+	return fmt.Sprintf("%016x/%016x", p.TXID, p.Chksum)
+}
+
 // FormatDBID formats id as a 16-character hex string.
 func FormatDBID(id uint32) string {
 	return fmt.Sprintf("%08x", id)

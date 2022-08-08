@@ -78,6 +78,19 @@ func (db *DB) Pos() Pos {
 	return db.pos
 }
 
+// Sets the position; use this setter to keep the position file up to date
+func (db *DB) SetPos(pos Pos) error {
+	db.pos = pos
+
+	// Update the position file
+	//TODO make this memory-mapped for better performance?
+	if err := os.WriteFile(filepath.Join(db.path, "position"), []byte(db.pos.Format()), 0666); err != nil {
+		return fmt.Errorf("unable to update position", err)
+	}
+
+	return nil
+}
+
 // TXID returns the current transaction ID.
 func (db *DB) TXID() uint64 { return db.Pos().TXID }
 
@@ -129,9 +142,8 @@ func (db *DB) recoverFromLTX() error {
 			return fmt.Errorf("ltx header max txid mismatch: %d != %d", hdr.MaxTXID, maxTXID)
 		}
 
-		db.pos = Pos{
-			TXID:   maxTXID,
-			Chksum: hdr.PostChecksum,
+		if err := db.SetPos(Pos{TXID: maxTXID, Chksum: hdr.PostChecksum}); err != nil {
+			return err
 		}
 	}
 
@@ -347,9 +359,8 @@ func (db *DB) CommitJournal(mode JournalMode) error {
 	}
 
 	// Update transaction for database.
-	db.pos = Pos{
-		TXID:   hdr.MaxTXID,
-		Chksum: hdr.PostChecksum,
+	if err := db.SetPos(Pos{TXID: hdr.MaxTXID, Chksum: hdr.PostChecksum}); err != nil {
+		return err
 	}
 
 	// Notify store of database change.
@@ -481,9 +492,8 @@ func (db *DB) TryApplyLTX(path string) error {
 	}
 
 	// Update transaction for database.
-	db.pos = Pos{
-		TXID:   hdr.MaxTXID,
-		Chksum: hdr.PostChecksum,
+	if err := db.SetPos(Pos{TXID: hdr.MaxTXID, Chksum: hdr.PostChecksum}); err != nil {
+		return err
 	}
 
 	// Notify store of database change.
