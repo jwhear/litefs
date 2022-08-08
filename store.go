@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/superfly/ltx"
 	"golang.org/x/sync/errgroup"
-	"github.com/google/uuid"
 )
 
 // Store represents a collection of databases.
@@ -41,8 +41,8 @@ type Store struct {
 	// Callback to notify kernel of file changes.
 	Invalidator Invalidator
 
-    // Unique ID for this store
-    id string
+	// Unique ID for this store
+	id string
 }
 
 // NewStore returns a new instance of Store.
@@ -55,7 +55,7 @@ func NewStore(path string) *Store {
 		dbsByName: make(map[string]*DB),
 
 		subscribers: make(map[*Subscriber]struct{}),
-		id: uuid.NewString(),
+		id:          uuid.NewString(),
 	}
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 
@@ -318,6 +318,11 @@ func (s *Store) monitor(ctx context.Context) error {
 
 		// Attempt to either obtain a primary lock or read the current primary.
 		lease, primaryURL, err := s.acquireLeaseOrPrimaryURL(ctx)
+		if err := os.WriteFile(filepath.Join(s.path, "primary_url"), []byte(primaryURL), 0666); err != nil {
+			log.Printf("failed to write current primary URL to %s: %s", err)
+			return err
+		}
+
 		if err != nil {
 			log.Printf("cannot acquire lease or find primary, retrying: %s", err)
 			time.Sleep(1 * time.Second)
@@ -356,7 +361,10 @@ func (s *Store) acquireLeaseOrPrimaryURL(ctx context.Context) (Lease, string, er
 	if err != nil && err != ErrPrimaryExists {
 		return nil, "", fmt.Errorf("acquire lease: %w", err)
 	} else if lease != nil {
-		return lease, "", nil
+		if primaryURL, err = s.Leaser.PrimaryURL(ctx); err != nil {
+			return nil, "", err
+		}
+		return lease, primaryURL, nil
 	}
 
 	// If we raced to become primary and another node beat us, retry the fetch.
