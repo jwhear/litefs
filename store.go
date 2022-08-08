@@ -42,7 +42,7 @@ type Store struct {
 	Invalidator Invalidator
 
     // Unique ID for this store
-	id string
+    id string
 }
 
 // NewStore returns a new instance of Store.

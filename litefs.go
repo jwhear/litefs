@@ -284,5 +284,3 @@ func assert(condition bool, msg string) {
 		panic("assertion failed: " + msg)
 	}
 }
-
-

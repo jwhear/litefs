@@ -188,17 +188,17 @@ func (m *Main) Run(ctx context.Context) (err error) {
 
     // Use Consul?
 	if m.Config.Consul.URL != "" {
-    	log.Println("Using Consul to determine primary")
-    	// key must be set
-    	if m.Config.Consul.Key == "" {
-    		return fmt.Errorf("consul.key required")
-    	}
-    	if err := m.initConsul(ctx); err != nil {
-    		return fmt.Errorf("cannot init consul: %w", err)
-    	}
+        log.Println("Using Consul to determine primary")
+        // key must be set
+        if m.Config.Consul.Key == "" {
+            return fmt.Errorf("consul.key required")
+        }
+        if err := m.initConsul(ctx); err != nil {
+            return fmt.Errorf("cannot init consul: %w", err)
+        }
 	} else if m.Config.PrimaryURL != "" {
-    	log.Println("Using FixedPrimary to determine primary")
-    	m.Leaser = fixedprimary.NewLeaser(m.Config.PrimaryURL, m.Store.ID())
+        log.Println("Using FixedPrimary to determine primary")
+        m.Leaser = fixedprimary.NewLeaser(m.Config.PrimaryURL, m.Store.ID())
 	}
 
 	if err := m.openStore(ctx); err != nil {
