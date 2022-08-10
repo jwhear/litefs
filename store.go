@@ -332,14 +332,26 @@ func (s *Store) monitor(ctx context.Context) error {
 		// Monitor as primary if we have obtained a lease.
 		if lease != nil {
 			log.Printf("primary lease acquired, advertising as %s", s.Leaser.AdvertiseURL())
+
+            // Create/update the is_primary file
+            if err := os.WriteFile(filepath.Join(s.path, "is_primary"), []byte(""), 0666); err != nil {
+                log.Printf("failed to create is_primary file: %s", err)
+            }
+
 			if err := s.monitorAsPrimary(ctx, lease); err != nil {
 				log.Printf("primary lease lost, retrying: %s", err)
 			}
 			continue
 		}
 
-		// Monitor as replica if another primary already exists.
+		// Another primary already exists.
 		log.Printf("existing primary found (%s), connecting as replica", primaryURL)
+
+        // Remove the is_primary file
+        if err := os.Remove(filepath.Join(s.path, "is_primary")); err != nil {
+            log.Printf("failed to create is_primary file: %s", err)
+        }
+        // Monitor as replica
 		if err := s.monitorAsReplica(ctx, primaryURL); err != nil {
 			log.Printf("replica disconected, retrying: %s", err)
 			time.Sleep(1 * time.Second)
